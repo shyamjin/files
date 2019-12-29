@@ -1,0 +1,68 @@
+pipeline {
+  agent {
+    node {
+      label 'master'
+    }
+
+  }
+  stages {
+    stage('Initialize') {
+      steps {
+        sh '''echo "Setup Additional Required...."
+					#echo " All Env Variables"
+					#env
+
+					'''
+      }
+    }
+    stage('Create DU in DPM') {
+      steps {
+        sh '''/dpm/scripts/invoke_generate_edpm_du_script.sh '''
+      }
+    }
+    stage('Build') {
+      steps {
+        sh '''/dpm/scripts/invoke_build_script.sh'''
+      }
+    }
+    stage('Upload Build to Nexus') {
+      steps {
+        nexusArtifactUploader(artifacts: [
+                              [artifactId: 'build', classifier: BUILD_NUMBER, file: 'build.zip', type: 'zip']],         
+                              credentialsId: 'NEXUS-DEPLOY',
+                              groupId: JOB_NAME,
+                              nexusUrl: 'indlin4777:8081',
+                              nexusVersion: 'nexus3',
+                              protocol: 'http',
+                              repository: REPO_ID,
+                              version: BUILD_NUMBER)
+        }
+      }
+      stage('Upload Build to DPM') {
+        steps {
+         sh '''/dpm/scripts/invoke_generate_edpm_build_script.sh'''
+        }
+      }
+      stage('Cleanup') {
+        steps {
+          cleanWs(cleanWhenSuccess: true)
+        }
+      }
+    }
+    environment {
+      REPO_ID = 'vp_builds'
+      ARTIFACT_ID = 'build'
+    }
+    post {
+      success {
+        echo ' Pipeline Completed.No issues reported!'
+
+      }
+
+      failure {
+        echo ' Pipeline Failed.Send an notification!'
+
+      }
+
+    }
+  }
